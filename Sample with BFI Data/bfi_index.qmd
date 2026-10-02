@@ -1,0 +1,240 @@
+---
+title: "9041 Assignment 2"
+author: Selena Esteves
+date: today
+format: 
+    html:
+      toc: true
+      code-fold: true
+      code-summary: "Show code"
+      df-print: paged
+execute:
+    echo: false
+    warning: false
+---
+
+```{r, load libraries}
+#| output: FALSE
+# Output false ensures your reproducible document does not show all of your code!
+
+# Remember to install packages you do not already have
+
+library(tidyverse)
+library(readxl)
+library(psych)
+library(gt)
+library(janitor)
+```
+
+```{r}
+#| output: FALSE
+
+# Load data
+data<-read_excel("./bfi.xlsx")
+
+
+# Inspect data for the big five dataset
+head(data)
+```
+
+```{r, clean data}
+#| output: FALSE
+
+# Use mutate to rename variables in a meaningful way - such that those assigned gender value 1 in the dataset are listed as Male and those assigned gender value of 2 are listed as Female. Do the same for education values
+# Extract for only variables age, Gender, education, and big five values
+# Mutate to convert bfi values to integers
+
+bfi.clean <- data |>
+    mutate(Gender = case_when(gender==1 ~ "Male", gender==2 ~"Female", TRUE ~ "NA")) |> 
+    mutate(education = case_when(education==1 ~ "High School", education==2 ~ "Finished High School",education==3 ~ "Some College", education==4 ~ "College Graduate", education==5 ~ "Graduate Degree", TRUE ~ "NA")) |> 
+    select(age, Gender, education, A1:O5) |>
+    mutate_at(4:28, as.integer)
+
+```
+
+```{r, score items}
+#| output: FALSE
+
+# Answer key: which items belong to each subscale.
+# "-" marks reverse-coded items (e.g., E1 "Don't talk a lot" -> high = LESS extraverted), which get flipped so higher scores always mean more of the trait.
+
+keys<- list(Openness=c("O1", "-O2", "O3", "O4", "-O5"),
+                Conscientiousness=c("C1", "C2", "C3", "-C4", "-C5"),
+                Extraversion=c("-E1", "-E2", "E3", "E4", "E5"),
+                Agreeableness = c("-A1", "A2", "A3", "A4", "A5"),
+                Neuroticism=c("N1", "N2", "N3", "N4", "N5"))
+
+
+# Average items per person, and compute Cronbach's alpha.
+# Returns $scores (per-person scores as averages since we set totals to F) and $alpha (reliability)
+scores<-scoreItems(keys, bfi.clean, totals = F, min=1, max=6)
+
+# Turn this into a dataframe!
+scores.df<-as.data.frame(scores$scores)
+
+```
+
+```{r, combine data frames}
+#| output: FALSE
+
+# Combine the original data set with the new scores dataframe
+bfi.clean<-cbind(bfi.clean, scores.df)
+
+# Inspect new data set
+head(bfi.clean)
+```
+
+```{r, reduced data}
+#| output: FALSE
+
+# Select only for the columns which you want to appear in your final data table
+bfi.final<- bfi.clean |>
+    select("age", "Gender", "education", "Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism") |>
+    mutate_if(is.numeric, round, 2)
+```
+
+```{r, reproducible table for education distribution}
+#| output: FALSE
+
+# Create a demographics table of education by gender
+demographictable <- bfi.final |>
+  tabyl(education, Gender)
+
+# Create your reproducible gt table
+gttable.1 <- demographictable |>
+  gt() |>
+  tab_header(
+    title = md("*Distribution of Males and Females by Education Level*")
+  )
+
+```
+
+```{r, reproducible table for big five scores}
+#| output: FALSE
+
+# Round Cronbach's alpha values to 2 decimal places.
+alphas <- t(round(scores$alpha, 2))
+
+# Summary statistics for certain columns
+summary <- describe(select(bfi.final, Openness:Neuroticism))
+summary
+
+# Label sample size for later in your reproducible document using describe
+n <- (describe(bfi.final))[1,2]
+
+# Name an object of Subscales so this can appear in your table
+Subscales <- c("Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism")
+
+# Create a column called Subscales in your summary table
+summary$Subscales<- Subscales
+
+
+# Select for only the columns which you want to appear in your final table
+summary <- summary |>
+    select(Subscales, mean, median, sd, range) |>
+       mutate_if(is.numeric, round, 2)
+
+# Combine summary information with alpha values
+final.reptable <- cbind(summary, alphas)
+
+# Create a reproducible table
+gttable.2<- gt(final.reptable) |>
+    tab_header(
+        title = md("*Descriptive Statistics for the Big Five Inventory Subscales*")) |>
+    tab_stubhead(label= "Composites")|>
+    tab_spanner(
+        label="Central Tendency",
+        columns = c(mean, median)
+    )|>
+        tab_spanner(
+        label="Variability",
+        columns = c(sd, range)
+        )|>
+            tab_spanner(
+        label="Reliability Values (Chronbach's alpha)",
+        columns = c(alpha)
+            ) 
+
+```
+
+```{r, filtered dataset}
+#| output: FALSE
+
+# Use filter to extract only those participants who are over 18 and under 65
+
+bfi.filtered <- bfi.clean |>
+    filter(age >= 18 & age <= 65)
+
+# Checking that age restriction worked
+table(bfi.filtered$age) 
+```
+
+```{r, reproducible FILTERED table for big five scores}
+#| output: FALSE
+
+# Round Cronbach's alpha values to 2 decimal places. t transposes the data, which is not needed with the other data set. Follow code in instruction document.
+alphas_filtered <- t(round(scores$alpha, 2))
+
+# Summary statistics for certain columns
+summary_filtered <- describe(select(bfi.filtered, Openness:Neuroticism))
+summary_filtered
+
+# Name an object of Subscales so this can appear in your table
+Subscales <- c("Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism")
+
+#Create a column called Subscales in your summary table
+summary_filtered$Subscales<- Subscales
+
+# Select for only the columns which you want to appear in your final table
+summary_filtered <- summary_filtered |>
+    select(Subscales, mean, median, sd, range) |>
+       mutate_if(is.numeric, round, 2)
+
+# Combine summary information with alpha values
+filtered.reptable <- cbind(summary_filtered, alphas_filtered)
+
+# Create a reproducible table
+gttable.3<- gt(filtered.reptable) |>
+    tab_header(
+        title = md("*Descriptive Statistics for the Big Five Inventory Subscales in people 18 to 65*")) |>
+    tab_stubhead(label= "Composites")|>
+    tab_spanner(
+        label="Central Tendency",
+        columns = c(mean, median)
+    )|>
+        tab_spanner(
+        label="Variability",
+        columns = c(sd, range)
+        )|>
+            tab_spanner(
+        label="Reliability Values (Chronbach's alpha)",
+        columns = c(alpha)
+            ) 
+```
+## Intro
+
+## Methods
+
+### Participants
+
+In this data set there were `{r} n` participants, with varying distributions of education type (Table 1).
+
+`{r} gttable.1`
+
+### Measures
+
+In this BFI data set, the 5 factors refer to the 5 composites included in the Big Five Inventory. Openness, which indicates one's open-mindedness, creativity, and likelihood to embrace new experiences (Cronbach's alpha = `{r} alphas[1]`). Conscientiousness, which refers to one's tendency to be reliable, organized, and disciplined (Cronbach's alpha = `{r} alphas[2]`). Extraversion, which refers to one's social interactions and emotional expression (Cronbach's alpha = `{r} alphas[3]`). Agreeableness, which refers to one's tendency to cooperate or desire to compete (Cronbach's alpha = `{r} alphas[4]`). and Neuroticism which refers to one's tendency toward depression, anxiety, or negative feelings (Cronbach's alpha =`{r} alphas[5]`).
+
+### Data Analysis Strategy
+
+The data for variables O2, C4, E1, E2, and A1 were reverse keyed.
+
+## Results
+
+`{r} gttable.2`
+In this BFI data set, the 5 factors refer to the 5 composites included in the Big Five Inventory. Participants had a mean score on Openness of `{r} final.reptable[1,2]`, on Conscientiousness of `{r} final.reptable[2,2]`, on Extraversion of `{r} final.reptable[3,2]`, on Agreeableness of `{r} final.reptable[4,2]`, and on Neuroticism of `{r} final.reptable[5,2]`.
+
+`{r} gttable.3`
+When only including participants over age 18 and below age 65, this BFI data set, the 5 factors refer to the 5 composites included in the Big Five Inventory. Participants had a mean score on Openness of `{r} filtered.reptable[1,2]`, on Conscientiousness of `{r} filtered.reptable[2,2]`, on Extraversion of `{r} filtered.reptable[3,2]`, on Agreeableness of `{r} filtered.reptable[4,2]`, and on Neuroticism of `{r} filtered.reptable[5,2]`.
+
+## Discussion
