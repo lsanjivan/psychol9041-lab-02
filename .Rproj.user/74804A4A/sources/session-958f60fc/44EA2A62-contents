@@ -1,0 +1,225 @@
+# ============================================================================
+# Outputs:
+#   meta_data.csv                    subnr + survey metadata
+#   long_data.csv                 
+#   object_data_summary_raw.csv      recoded raw responses + per-object, Mean/SD, 
+#                                     Likert correlations and average SD
+#   object_data_summary_zscored.csv  Likert cells z-scored
+#
+# Pipeline: raw import -> duplicate-column fix -> Likert recoding ->
+#           long conversion -> within-participant z-score normalization -> write
+#
+# long_data columns: subnr, gender, object, question, value, z
+#   gender comes from demographics.csv (Q591), matched on subnr
+# ============================================================================
+
+library(tidyverse)
+
+raw <- read_csv("data.csv",
+                col_types = cols(.default = col_character()),
+                name_repair = "minimal")
+
+# the 2nd Crayons_Interact --> Think;Tongs_Action --> Open
+nm <- names(raw)
+nm[nm == "Crayons_Interact" & duplicated(nm)] <- "Crayons_Think"
+nm[nm == "Tongs_Action"     & duplicated(nm)] <- "Tongs_Open"
+names(raw) <- nm
+
+# drop junk
+raw <- raw |> slice(-(1:2))   
+
+# recode agree-disagree likert questions
+recode_qs   <- c("Precise", "Think", "Action", "Feeling")
+likert_map  <- c("1" = "1", "8" = "2", "2" = "3", "3" = "4",
+                 "4" = "5", "5" = "6", "6" = "7")
+recode_cols <- names(raw)[str_remove(names(raw), "^[^_]+_") %in% recode_qs]
+raw <- raw |>
+  mutate(across(all_of(recode_cols), ~ unname(likert_map[as.character(.x)])))
+
+# sort and label columns
+likert_qs      <- c("Often", "Interact", "Precise", "Think", "Action", "Feeling")
+first_data_col <- which(names(raw) == "Spoon_Know")
+subnr_col      <- which(names(raw) == "SUBNR")
+meta_cols      <- names(raw)[1:(first_data_col - 1)]          # StartDate ... Q3
+block_cols     <- names(raw)[first_data_col:(subnr_col - 1)]  # everything before SUBNR
+# seperation of data from other metadata
+data_cols      <- block_cols[str_detect(block_cols, "_")]
+extra_cols     <- setdiff(block_cols, data_cols)            
+
+# write metadata
+meta_data <- raw |>
+  select(subnr = SUBNR, all_of(meta_cols))
+write_csv(meta_data, "meta_data.csv")
+
+# participant gender from the demographics export (matched on subnr)
+# same Qualtrics layout as data.csv: drop the two junk header rows. Gender is
+# the Q591 ("gender identity - Selected Choice") column.
+gender_data <- read_csv("demographics.csv",
+                        col_types = cols(.default = col_character()),
+                        name_repair = "minimal") |>
+  slice(-(1:2)) |>
+  select(subnr = SUBNR, gender = Q591)
+
+# mutate/pivot + normalize + attach gender
+long_data <- raw |>
+  select(subnr = SUBNR, all_of(data_cols)) |>
+  pivot_longer(-subnr,
+               names_to = c("object", "question"),
+               names_pattern = "([^_]+)_(.*)",
+               values_to = "value") |>
+  # Drop a participant's data for any object they did not recognize so the
+  # ratings (and the z-scores below) are computed only over recognized objects.
+  group_by(subnr, object) |>
+  filter(!any(question == "Know" & value == "2", na.rm = TRUE)) |>
+  ungroup() |>
+  group_by(subnr, question) |>
+  mutate(z = if (first(question) %in% likert_qs) {
+               v <- suppressWarnings(as.numeric(value))
+               s <- sd(v, na.rm = TRUE)
+               if (is.na(s) || s == 0) NA_real_ else (v - mean(v, na.rm = TRUE)) / s
+             } else NA_real_) |>
+  ungroup() |>
+  left_join(gender_data, by = "subnr") |>
+  relocate(gender, .after = subnr)
+write_csv(long_data, "long_data.csv")
+
+# Object-data summary sheets
+
+# Words count = whitespace-separated tokens; empty/NA responses are excluded
+word_count <- function(x) {
+  x <- str_trim(x)
+  if_else(is.na(x) | x == "", NA_integer_, str_count(x, "\\S+"))
+}
+
+build_summary <- function(data_df) {
+  labels    <- names(data_df)[-1]
+  objects   <- str_extract(labels, "^[^_]+")
+  questions <- str_remove(labels, "^[^_]+_")
+
+  # Mean row
+  mean_row <- map2_chr(data_df[-1], questions, function(col, q) {
+    num <- suppressWarnings(as.numeric(col))
+    if (q %in% likert_qs) {
+      as.character(round(mean(num, na.rm = TRUE), 2))
+    } else if (q == "Know") {
+      n_resp <- sum(!is.na(num))
+      if (n_resp == 0) "" else
+        str_c(round(sum(num == 1, na.rm = TRUE) / n_resp * 100, 1), "%")
+    } else if (q == "Open") {
+      as.character(round(mean(word_count(col), na.rm = TRUE), 2))
+    } else {
+      ""                                      
+    }
+  })
+
+  # SD row
+  sd_num <- map2_dbl(data_df[-1], questions, function(col, q) {
+    if (q %in% likert_qs) {
+      sd(suppressWarnings(as.numeric(col)), na.rm = TRUE)
+    } else {
+      NA_real_
+    }
+  })
+  sd_row <- if_else(is.na(sd_num), "", as.character(round(sd_num, 2)))
+
+  # ---- Correlation matrix between Likert questions, across all objects ----
+  # Each observation is one participant x object pair, so the correlations
+  # reflect how the ratings covary across every object in the survey.
+  likert_wide <- data_df |>
+    pivot_longer(-subnr,
+                 names_to = c("object", "question"),
+                 names_pattern = "([^_]+)_(.*)",
+                 values_to = "value") |>
+    filter(question %in% likert_qs) |>
+    mutate(value = suppressWarnings(as.numeric(value))) |>
+    pivot_wider(id_cols = c(subnr, object),
+                names_from = question, values_from = value)
+
+  cor_mat <- likert_wide |>
+    select(all_of(likert_qs)) |>
+    cor(use = "pairwise.complete.obs") |>
+    round(2)
+
+  # Pad the (7-wide) correlation block out to the full sheet width
+  pad <- function(x) c(x, rep("", ncol(data_df) - length(x)))
+  cor_block <- rbind(
+    pad(""),                                       # blank spacer row
+    pad(c("Correlations", likert_qs)),
+    t(vapply(likert_qs,
+             function(q) pad(c(q, as.character(cor_mat[q, ]))),
+             character(ncol(data_df))))
+  )
+
+  # Average SD per Likert question, across all objects
+  avg_sd <- tibble(question = questions, sd = sd_num) |>
+    filter(question %in% likert_qs) |>
+    group_by(question) |>
+    summarise(avg = mean(sd, na.rm = TRUE)) |>
+    deframe()
+
+  avg_sd_block <- rbind(
+    pad(""),                                       
+    pad(c("Average SD", likert_qs)),
+    pad(c("", as.character(round(avg_sd[likert_qs], 2))))
+  )
+
+# assemble
+    rbind(c("subnr", questions),
+        c("",      objects),
+        as.matrix(data_df),
+        c("Mean",  mean_row),
+        c("SD",    sd_row),
+        cor_block,
+        avg_sd_block) |>
+    as_tibble(.name_repair = ~ names(data_df))
+}
+
+# Wide sheets, columns in the original survey order. Both are built from
+# long_data so the Know == "2" drop is honoured (dropped subnr x object cells
+# come out blank); the feedback field (extra_cols, e.g. Q1368) is rejoined.
+# Raw
+data_df_raw <- long_data |>
+  transmute(subnr, col = str_c(object, "_", question), out = value) |>
+  pivot_wider(names_from = col, values_from = out) |>
+  left_join(raw |> select(subnr = SUBNR, all_of(extra_cols)), by = "subnr") |>
+  select(subnr, all_of(block_cols))
+
+# Z-scored
+data_df_z <- long_data |>
+  transmute(subnr,
+            col = str_c(object, "_", question),
+            out = if_else(question %in% likert_qs, as.character(round(z, 3)), value)) |>
+  pivot_wider(names_from = col, values_from = out) |>
+  left_join(raw |> select(subnr = SUBNR, all_of(extra_cols)), by = "subnr") |>
+  select(subnr, all_of(block_cols))
+
+write_csv(build_summary(data_df_raw), "object_data_summary_raw.csv",     col_names = FALSE)
+write_csv(build_summary(data_df_z),   "object_data_summary_zscored.csv", col_names = FALSE)
+
+# ---- Z-scored summary WITHOUT the Know == "2" drop ----
+# Same as object_data_summary_zscored.csv, but z-scores are computed over ALL
+# objects (recognised or not), so unrecognised-object cells are kept.
+long_nofilter <- raw |>
+  select(subnr = SUBNR, all_of(data_cols)) |>
+  pivot_longer(-subnr,
+               names_to = c("object", "question"),
+               names_pattern = "([^_]+)_(.*)",
+               values_to = "value") |>
+  group_by(subnr, question) |>
+  mutate(z = if (first(question) %in% likert_qs) {
+               v <- suppressWarnings(as.numeric(value))
+               s <- sd(v, na.rm = TRUE)
+               if (is.na(s) || s == 0) NA_real_ else (v - mean(v, na.rm = TRUE)) / s
+             } else NA_real_) |>
+  ungroup()
+
+data_df_z_nofilter <- long_nofilter |>
+  transmute(subnr,
+            col = str_c(object, "_", question),
+            out = if_else(question %in% likert_qs, as.character(round(z, 3)), value)) |>
+  pivot_wider(names_from = col, values_from = out) |>
+  left_join(raw |> select(subnr = SUBNR, all_of(extra_cols)), by = "subnr") |>
+  select(subnr, all_of(block_cols))
+
+write_csv(build_summary(data_df_z_nofilter),
+          "object_data_summary_zscored_nofilter.csv", col_names = FALSE)

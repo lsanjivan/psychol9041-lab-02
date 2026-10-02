@@ -1,0 +1,28 @@
+{
+    "id": "8FB1727D",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1790629054135.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "id": "4a8398691fbd4e42bc9f8d06a4a23b92",
+        "name": "ECR_scores",
+        "title": "ECR_scores",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 32370111954616435,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1790629054135,
+    "read_only": false,
+    "read_only_alternatives": []
+}

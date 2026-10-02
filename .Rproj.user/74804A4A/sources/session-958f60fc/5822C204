@@ -1,0 +1,28 @@
+{
+    "id": "5822C204",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1790629047215.0,
+    "source_on_save": false,
+    "relative_order": 6,
+    "properties": {
+        "id": "4b5b8dead13d4ef28449fd0561e156ba",
+        "name": "ECR_key",
+        "title": "ECR_key",
+        "language": "R",
+        "source_window_id": "",
+        "Source": "Source"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 59110844634628352,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1790629047215,
+    "read_only": false,
+    "read_only_alternatives": []
+}

@@ -1,0 +1,181 @@
+---
+title: "Report"
+format: html
+editor: visual
+---
+
+```{r, load libraries}
+#| output: FALSE
+
+library(psych)
+library(tidyverse)
+library(gt)
+library(janitor)
+
+data <- read_csv("Attachment_Anxiety_Data.csv")
+
+data <- data |>
+  mutate(Gender = case_when(
+    Gender == 1 ~ "Male",
+    Gender == 2 ~ "Female",
+    TRUE        ~ NA_character_
+  )) |>
+  mutate(Relationship = case_when(
+    Relationship == 1 ~ "Married",
+    Relationship == 2 ~ "In a relationship",
+    Relationship == 4 ~ "Divorced",
+    Relationship == 5 ~ "In a relationship",
+    Relationship == 6 ~ "Never been in a relationship",
+    Relationship == 7 ~ "Prefer not to say",
+    TRUE              ~ NA_character_
+  )) |>
+  mutate(across(SA_1:SEst_10, as.integer))
+
+SIAS_key <- list(SocialAnxiety = c(
+  "SA_1", "SA_2", "SA_3", "SA_4", "-SA_5",
+  "SA_6", "SA_7", "SA_8", "-SA_9", "SA_10",
+  "-SA_11", "SA_12", "SA_13", "SA_14", "SA_15",
+  "SA_16", "SA_17", "SA_18", "SA_19", "SA_20"
+))
+
+ECR_key <- list(AttachmentAnxiety = c(
+  "AA_1", "AA_2", "AA_3", "AA_4", "AA_5",
+  "AA_6", "AA_7", "AA_8", "AA_9"
+))
+
+RSES_key <- list(SelfEsteem = c(
+  "SEst_1", "-SEst_2", "SEst_3", "SEst_4", "-SEst_5",
+  "-SEst_6", "SEst_7", "-SEst_8", "-SEst_9", "SEst_10"
+))
+  
+SIAS_scores <- scoreItems(SIAS_key, data, totals = F, min = 1, max = 5)
+ECR_scores <- scoreItems(ECR_key, data, totals = F, min = 1, max = 7)
+RSES_scores <- scoreItems(RSES_key, data, totals = F, min = 1, max = 4)
+
+SIAS_scaled <- as.data.frame(SIAS_scores$scores)
+ECR_scaled <- as.data.frame(ECR_scores$scores)
+RSES_scaled <- as.data.frame(RSES_scores$scores)
+
+allscores_df <- cbind(SIAS_scaled, ECR_scaled, RSES_scaled)
+
+merged_df <- cbind(data, allscores_df)
+
+final_df <- merged_df |>
+  select(URN, Gender, Relationship, SocialAnxiety, AttachmentAnxiety, SelfEsteem)
+n <- nrow(final_df)
+
+
+demographic_table <- final_df |> 
+  tabyl(Gender, Relationship)
+
+gttable_1 <- demographic_table |>
+  gt() |>
+  tab_header(
+    title = md("*Distribution of Males and Females by Relationship Status*")
+  )
+
+summary <- describe(select(final_df, SocialAnxiety:SelfEsteem))
+
+summary$Scales <- c("Social Interaction Anxiety", "Attachment Anxiety", "Self-Esteem")
+
+alphas <- round(c(
+  SIAS_scores$alpha,
+  ECR_scores$alpha,
+  RSES_scores$alpha
+), 2)
+
+summary <- summary |>
+  select(Scales, mean, median, sd, range) |>
+  mutate_if(is.numeric, round, 2)
+
+score_table <- cbind(summary, alpha = alphas)
+
+gttable_2 <- gt(score_table) |>
+  tab_header(
+    title = md("*Descriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales*")
+  ) |>
+  tab_spanner(label = "Central Tendency", columns = c(mean, median)) |>
+  tab_spanner(label = "Variability", columns = c(sd, range)) |>
+  tab_spanner(label = "Reliability (Cronbach's alpha)", columns = c(alpha))
+
+
+female_df <- merged_df |>
+  filter(Gender == "Female")
+
+summary_female <- describe(select(female_df, SocialAnxiety:SelfEsteem))
+
+n_female <- nrow(female_df)
+
+summary_female$Scales <- c("Social Interaction Anxiety", "Attachment Anxiety", "Self-Esteem")
+
+SIAS_scores_female <- scoreItems(SIAS_key, female_df, totals = F, min = 1, max = 5)
+ECR_scores_female  <- scoreItems(ECR_key,  female_df, totals = F, min = 1, max = 7)
+RSES_scores_female <- scoreItems(RSES_key, female_df, totals = F, min = 1, max = 4)
+
+alphas_female <- round(c(
+  SIAS_scores_female$alpha,
+  ECR_scores_female$alpha,
+  RSES_scores_female$alpha
+), 2)
+
+summary_female <- summary_female |>
+  select(Scales, mean, median, sd, range) |>
+  mutate_if(is.numeric, round, 2)
+
+score_table_female <- cbind(summary_female, alpha = alphas_female)
+
+gttable_3 <- gt(score_table_female) |>
+  tab_header(
+    title = md("*Descriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales in Female Participants*")
+  ) |>
+  tab_spanner(label = "Central Tendency", columns = c(mean, median)) |>
+  tab_spanner(label = "Variability", columns = c(sd, range)) |>
+  tab_spanner(label = "Reliability (Cronbach's alpha)", columns = c(alpha))
+
+```
+
+
+## Intro
+
+## Methods
+
+### Participants
+
+In this data set there were `{r} n` participants, with varying distributions of gender and marital status (Table 1).
+
+`{r} gttable_1`
+
+### Measures
+
+This dataset includes responses to three questionnaires.
+
+**Social interaction anxiety.** This questionnaire has 20 items regarding anxiety surrounding social interactions. Items were rated on a five-point scale, and higher scores mean more social interaction anxiety (Cronbach's alpha = `{r} alphas[1]`).
+
+**Attachment anxiety.** This subscale was shortened by only including the nine items that loaded most strongly on the Anxiety subscale in a factor analysis conducted by Sibley, Fischer & Liu (2005). Items were rated on a seven-point scale, and higher scores mean more worry about rejection and abandonment in close relationships (Cronbach's alpha = `{r} alphas[2]`).
+
+**Self-esteem.** The Rosenberg Self-Esteem Scale has 10 items about overall feelings of self-esteen. Items were rated on a four-point scale, and higher scores mean higher self-esteem (Cronbach's alpha = `{r} alphas[3]`).
+
+### Data Analysis Strategy
+
+The data for variables SA5, SA11, SA9, SEst2, SEst5, SEst6, SEst8, and SEst9 were reverse keyed.
+
+
+## Results
+
+`{r} gttable.2`
+In this BFI data set, the 5 factors refer to the 5 composites included in the Big Five Inventory. Participants had a mean score on Openness of `{r} final.reptable[1,2]`, on Conscientiousness of `{r} final.reptable[2,2]`, on Extraversion of `{r} final.reptable[3,2]`, on Agreeableness of `{r} final.reptable[4,2]`, and on Neuroticism of `{r} final.reptable[5,2]`.
+
+`{r} gttable.3`
+When only including participants over age 18 and below age 65, this BFI data set, the 5 factors refer to the 5 composites included in the Big Five Inventory. Participants had a mean score on Openness of `{r} filtered.reptable[1,2]`, on Conscientiousness of `{r} filtered.reptable[2,2]`, on Extraversion of `{r} filtered.reptable[3,2]`, on Agreeableness of `{r} filtered.reptable[4,2]`, and on Neuroticism of `{r} filtered.reptable[5,2]`.
+
+## Results
+
+`{r} gttable_2`
+
+Table 2 shows descriptive statistics and Cronbach's alpha for each scale across all participants. The mean score was `{r} score_table$mean[1]` (*SD* = `{r} score_table$sd[1]`) for social interaction anxiety, `{r} score_table$mean[2]` (*SD* = `{r} score_table$sd[2]`) for attachment anxiety, and `{r} score_table$mean[3]` (*SD* = `{r} score_table$sd[3]`) for self-esteem.
+
+`{r} gttable_3`
+
+Table 3 shows the same statistics for only the `{r} n_female` female participants, with Cronbach's alpha recalculated from their responses. Their mean score was `{r} score_table_female$mean[1]` (*SD* = `{r} score_table_female$sd[1]`) for social interaction anxiety, `{r} score_table_female$mean[2]` (*SD* = `{r} score_table_female$sd[2]`) for attachment anxiety, and `{r} score_table_female$mean[3]` (*SD* = `{r} score_table_female$sd[3]`) for self-esteem.
+
+## Discussion
