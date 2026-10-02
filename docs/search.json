@@ -54,5 +54,40 @@
     "title": "Report",
     "section": "Discussion",
     "text": "Discussion"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Report",
+    "section": "",
+    "text": "Code\nlibrary(psych)\nlibrary(tidyverse)\nlibrary(gt)\nlibrary(janitor)\n\ndata &lt;- read_csv(\"Attachment_Anxiety_Data.csv\")\n\ndata &lt;- data |&gt;\n  mutate(Gender = case_when(\n    Gender == 1 ~ \"Male\",\n    Gender == 2 ~ \"Female\",\n    TRUE        ~ NA_character_\n  )) |&gt;\n  mutate(Relationship = case_when(\n    Relationship == 1 ~ \"Married\",\n    Relationship == 2 ~ \"In a relationship\",\n    Relationship == 4 ~ \"Divorced\",\n    Relationship == 5 ~ \"In a relationship\",\n    Relationship == 6 ~ \"Never been in a relationship\",\n    Relationship == 7 ~ \"Prefer not to say\",\n    TRUE              ~ NA_character_\n  )) |&gt;\n  mutate(across(SA_1:SEst_10, as.integer))\n\nSIAS_key &lt;- list(SocialAnxiety = c(\n  \"SA_1\", \"SA_2\", \"SA_3\", \"SA_4\", \"-SA_5\",\n  \"SA_6\", \"SA_7\", \"SA_8\", \"-SA_9\", \"SA_10\",\n  \"-SA_11\", \"SA_12\", \"SA_13\", \"SA_14\", \"SA_15\",\n  \"SA_16\", \"SA_17\", \"SA_18\", \"SA_19\", \"SA_20\"\n))\n\nECR_key &lt;- list(AttachmentAnxiety = c(\n  \"AA_1\", \"AA_2\", \"AA_3\", \"AA_4\", \"AA_5\",\n  \"AA_6\", \"AA_7\", \"AA_8\", \"AA_9\"\n))\n\nRSES_key &lt;- list(SelfEsteem = c(\n  \"SEst_1\", \"-SEst_2\", \"SEst_3\", \"SEst_4\", \"-SEst_5\",\n  \"-SEst_6\", \"SEst_7\", \"-SEst_8\", \"-SEst_9\", \"SEst_10\"\n))\n  \nSIAS_scores &lt;- scoreItems(SIAS_key, data, totals = F, min = 1, max = 5)\nECR_scores &lt;- scoreItems(ECR_key, data, totals = F, min = 1, max = 7)\nRSES_scores &lt;- scoreItems(RSES_key, data, totals = F, min = 1, max = 4)\n\nSIAS_scaled &lt;- as.data.frame(SIAS_scores$scores)\nECR_scaled &lt;- as.data.frame(ECR_scores$scores)\nRSES_scaled &lt;- as.data.frame(RSES_scores$scores)\n\nallscores_df &lt;- cbind(SIAS_scaled, ECR_scaled, RSES_scaled)\n\nmerged_df &lt;- cbind(data, allscores_df)\n\nfinal_df &lt;- merged_df |&gt;\n  select(URN, Gender, Relationship, SocialAnxiety, AttachmentAnxiety, SelfEsteem)\nn &lt;- nrow(final_df)\n\n\ndemographic_table &lt;- final_df |&gt; \n  tabyl(Gender, Relationship)\n\ngttable_1 &lt;- demographic_table |&gt;\n  gt() |&gt;\n  tab_header(\n    title = md(\"*Distribution of Males and Females by Relationship Status*\")\n  )\n\nsummary &lt;- describe(select(final_df, SocialAnxiety:SelfEsteem))\n\nsummary$Scales &lt;- c(\"Social Interaction Anxiety\", \"Attachment Anxiety\", \"Self-Esteem\")\n\nalphas &lt;- round(c(\n  SIAS_scores$alpha,\n  ECR_scores$alpha,\n  RSES_scores$alpha\n), 2)\n\nsummary &lt;- summary |&gt;\n  select(Scales, mean, median, sd, range) |&gt;\n  mutate_if(is.numeric, round, 2)\n\nscore_table &lt;- cbind(summary, alpha = alphas)\n\ngttable_2 &lt;- gt(score_table) |&gt;\n  tab_header(\n    title = md(\"*Descriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales*\")\n  ) |&gt;\n  tab_spanner(label = \"Central Tendency\", columns = c(mean, median)) |&gt;\n  tab_spanner(label = \"Variability\", columns = c(sd, range)) |&gt;\n  tab_spanner(label = \"Reliability (Cronbach's alpha)\", columns = c(alpha))\n\n\nfemale_df &lt;- merged_df |&gt;\n  filter(Gender == \"Female\")\n\nsummary_female &lt;- describe(select(female_df, SocialAnxiety:SelfEsteem))\n\nn_female &lt;- nrow(female_df)\n\nsummary_female$Scales &lt;- c(\"Social Interaction Anxiety\", \"Attachment Anxiety\", \"Self-Esteem\")\n\nSIAS_scores_female &lt;- scoreItems(SIAS_key, female_df, totals = F, min = 1, max = 5)\nECR_scores_female  &lt;- scoreItems(ECR_key,  female_df, totals = F, min = 1, max = 7)\nRSES_scores_female &lt;- scoreItems(RSES_key, female_df, totals = F, min = 1, max = 4)\n\nalphas_female &lt;- round(c(\n  SIAS_scores_female$alpha,\n  ECR_scores_female$alpha,\n  RSES_scores_female$alpha\n), 2)\n\nsummary_female &lt;- summary_female |&gt;\n  select(Scales, mean, median, sd, range) |&gt;\n  mutate_if(is.numeric, round, 2)\n\nscore_table_female &lt;- cbind(summary_female, alpha = alphas_female)\n\ngttable_3 &lt;- gt(score_table_female) |&gt;\n  tab_header(\n    title = md(\"*Descriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales in Female Participants*\")\n  ) |&gt;\n  tab_spanner(label = \"Central Tendency\", columns = c(mean, median)) |&gt;\n  tab_spanner(label = \"Variability\", columns = c(sd, range)) |&gt;\n  tab_spanner(label = \"Reliability (Cronbach's alpha)\", columns = c(alpha))"
+  },
+  {
+    "objectID": "index.html#intro",
+    "href": "index.html#intro",
+    "title": "Report",
+    "section": "Intro",
+    "text": "Intro"
+  },
+  {
+    "objectID": "index.html#methods",
+    "href": "index.html#methods",
+    "title": "Report",
+    "section": "Methods",
+    "text": "Methods\n\nParticipants\nIn this data set there were 63 participants, with varying distributions of gender and marital status (Table 1).\n\n\n\n\n\n\nDistribution of Males and Females by Relationship Status\n\n\nGender\nDivorced\nIn a relationship\nMarried\nNever been in a relationship\nPrefer not to say\n\n\n\n\nFemale\n0\n43\n4\n1\n2\n\n\nMale\n1\n11\n0\n0\n1\n\n\n\n\n\n\n\nMeasures\nThis dataset includes responses to three questionnaires.\nSocial interaction anxiety. This questionnaire has 20 items regarding anxiety surrounding social interactions. Items were rated on a five-point scale, and higher scores mean more social interaction anxiety (Cronbach’s alpha = 0.9).\nAttachment anxiety. This subscale was shortened by only including the nine items that loaded most strongly on the Anxiety subscale in a factor analysis conducted by Sibley, Fischer & Liu (2005). Items were rated on a seven-point scale, and higher scores mean more worry about rejection and abandonment in close relationships (Cronbach’s alpha = 0.94).\nSelf-esteem. The Rosenberg Self-Esteem Scale has 10 items about overall feelings of self-esteen. Items were rated on a four-point scale, and higher scores mean higher self-esteem (Cronbach’s alpha = 0.85).\n\n\nData Analysis Strategy\nThe data for variables SA5, SA11, SA9, SEst2, SEst5, SEst6, SEst8, and SEst9 were reverse keyed."
+  },
+  {
+    "objectID": "index.html#results",
+    "href": "index.html#results",
+    "title": "Report",
+    "section": "Results",
+    "text": "Results\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nDescriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales\n\n\nScales\n\nCentral Tendency\n\n\nVariability\n\n\nReliability (Cronbach's alpha)\n\n\n\nmean\nmedian\nsd\nrange\nalpha\n\n\n\n\nSocial Interaction Anxiety\n2.69\n2.60\n0.70\n3.00\n0.90\n\n\nAttachment Anxiety\n3.40\n3.11\n1.62\n5.89\n0.94\n\n\nSelf-Esteem\n2.23\n2.20\n0.51\n2.20\n0.85\n\n\n\n\n\nTable 2 shows descriptive statistics and Cronbach’s alpha for each scale across all participants. The mean score was 2.69 (SD = 0.7) for social interaction anxiety, 3.4 (SD = 1.62) for attachment anxiety, and 2.23 (SD = 0.51) for self-esteem.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nDescriptive Statistics for the Social Anxiety, Attachment Anxiety and Self-Esteem Scales in Female Participants\n\n\nScales\n\nCentral Tendency\n\n\nVariability\n\n\nReliability (Cronbach's alpha)\n\n\n\nmean\nmedian\nsd\nrange\nalpha\n\n\n\n\nSocial Interaction Anxiety\n2.74\n2.67\n0.72\n3.00\n0.90\n\n\nAttachment Anxiety\n3.43\n3.11\n1.71\n5.89\n0.94\n\n\nSelf-Esteem\n2.24\n2.20\n0.53\n2.20\n0.86\n\n\n\n\n\nTable 3 shows the same statistics for only the 50 female participants, with Cronbach’s alpha recalculated from their responses. Their mean score was 2.74 (SD = 0.72) for social interaction anxiety, 3.43 (SD = 1.71) for attachment anxiety, and 2.24 (SD = 0.53) for self-esteem."
+  },
+  {
+    "objectID": "index.html#discussion",
+    "href": "index.html#discussion",
+    "title": "Report",
+    "section": "Discussion",
+    "text": "Discussion"
   }
 ]
